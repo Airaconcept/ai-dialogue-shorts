@@ -132,12 +132,13 @@ def generate_placeholder(out_path: str, duration: int = 5, seed: int = 0) -> str
     # 暗调双色渐变（茶山晨雾感：深青→暖灰）
     c1 = f"{rng.randint(18,40):02x}{rng.randint(40,70):02x}{rng.randint(45,75):02x}"
     c2 = f"{rng.randint(90,130):02x}{rng.randint(100,140):02x}{rng.randint(95,125):02x}"
-    vf = (f"gradients=s=1080x1920:c0=0x{c1}:c1=0x{c2}:speed=0.02,"
-          f"zoompan=z='min(zoom+0.0008,1.15)':d={duration*30}:s=1080x1920:fps=30,"
-          f"noise=alls=6:allf=t")
+    vf = ("scale=1080:1920,"
+          "noise=alls=7:allf=t,"
+          "vignette=PI/5")
     subprocess.run(["ffmpeg", "-y", "-v", "error",
-                    "-f", "lavfi", "-i", "color=black:s=1080x1920:d=0.1",
-                    "-vf", vf, "-t", str(duration),
+                    "-f", "lavfi", "-i",
+                    f"gradients=s=540x960:c0=0x{c1}:c1=0x{c2}:speed=0.015",
+                    "-vf", vf, "-t", str(duration), "-r", "30",
                     "-c:v", "libx264", "-pix_fmt", "yuv420p",
                     out_path], check=True)
     return out_path

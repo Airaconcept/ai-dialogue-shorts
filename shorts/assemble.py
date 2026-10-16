@@ -56,9 +56,9 @@ def assemble(shots_json: str, workdir: str, out_mp4: str) -> str:
               "-c:v", "libx264", "-pix_fmt", "yuv420p", str(seg_out)])
         seg_files.append(str(seg_out))
 
-    # 2) 拼接
+    # 2) 拼接（列表用绝对路径：concat 按列表文件所在目录解析相对路径）
     lst = work / "list.txt"
-    lst.write_text("".join(f"file '{p}'\n" for p in seg_files))
+    lst.write_text("".join(f"file '{Path(p).resolve()}'\n" for p in seg_files))
     video_all = work / "video.mp4"
     _run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0",
           "-i", str(lst), "-c", "copy", str(video_all)])
