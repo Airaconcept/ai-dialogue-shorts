@@ -50,7 +50,10 @@ def _request(method: str, path: str, body: dict | None = None,
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(
         BASE_URL + path, data=data, method=method,
-        headers={"Content-Type": "application/json"})
+        headers={"Content-Type": "application/json",
+                 # 视频生成合规头（2026-10-16 实测：缺失报
+                 # "X-ModelScope-DataInspection is empty"，空 JSON 对象可通过）
+                 "X-ModelScope-DataInspection": "{}"})
     add_surrogate_to_request(req, CONNECTION, allowed_hosts=ALLOWED_HOSTS)
     try:
         with urllib.request.build_opener(NoRedirect()).open(
@@ -72,16 +75,30 @@ class WanVideoGenerator:
 
     def submit(self, prompt: str, duration: int = 5,
                aspect_ratio: str = "9:16") -> str:
-        data = _request("POST", SUBMIT_PATH, {
-            "model": self.model,
-            "prompt": prompt,
-            "duration": duration,
-            "aspect_ratio": aspect_ratio,
-        })
-        task_id = data.get("task_id") or data.get("id")
-        if not task_id:
-            raise RuntimeError(f"提交未返回 task_id: {str(data)[:300]}")
-        return task_id
+        # 429（任务槽位占满）时退避重试，最长等 2 小时
+        deadline = time.time() + 7200
+        attempt = 0
+        while True:
+            try:
+                data = _request("POST", SUBMIT_PATH, {
+                    "model": self.model,
+                    "prompt": prompt,
+                    "duration": duration,
+                    "aspect_ratio": aspect_ratio,
+                })
+            except RuntimeError as e:
+                if "429" in str(e) and time.time() < deadline:
+                    attempt += 1
+                    wait = min(180, 30 * attempt)
+                    print(f"[video] 任务槽位满，{wait}s 后重试 (#{attempt})…",
+                          flush=True)
+                    time.sleep(wait)
+                    continue
+                raise
+            task_id = data.get("task_id") or data.get("id")
+            if not task_id:
+                raise RuntimeError(f"提交未返回 task_id: {str(data)[:300]}")
+            return task_id
 
     def poll(self, task_id: str) -> dict:
         deadline = time.time() + self.timeout
