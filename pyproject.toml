@@ -1,0 +1,14 @@
+[project]
+name = "ai-dialogue-shorts"
+version = "0.1.0"
+description = "对话短视频流水线：文案→分镜→角色锁定→AI视频→配音→字幕→成片"
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml>=6.0",
+    "requests>=2.31",
+    "edge-tts>=6.1",
+    "pillow>=10.0",
+]
+
+[project.scripts]
+shorts = "cli:main"
