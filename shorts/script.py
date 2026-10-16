@@ -30,6 +30,23 @@ SHOT_HINTS = {
     "近景": "closeup",
     "特写": "extreme_closeup",
 }
+# 运镜 / 画面修饰关键词 → 英文提示词片段
+MODIFIER_HINTS = {
+    "缓推": "slow push-in",
+    "缓拉": "slow pull-back",
+    "左移": "gentle pan left",
+    "右移": "gentle pan right",
+    "环绕": "slow orbiting camera",
+    "静": "static tripod framing",
+    "航拍": "aerial view",
+    "手部": "focus on hands",
+    "侧逆光": "soft backlight",
+    "逆光": "backlit",
+    "过肩": "over-the-shoulder framing",
+    "低角度": "low angle",
+    "高角度": "high angle",
+}
+MOVE_KEYS = {"缓推", "缓拉", "左移", "右移", "环绕", "静"}
 AUTO_SHOT_ROTATION = ["wide", "medium", "closeup", "medium", "closeup", "extreme_closeup"]
 
 
@@ -47,6 +64,8 @@ class Block:
     shot_type: str = ""
     action_cn: str = ""
     action_en: str = ""
+    camera_move: str = ""      # 显式运镜（英文）
+    modifiers_en: str = ""     # 其它画面修饰（英文，逗号分隔）
 
 
 @dataclass
@@ -90,10 +109,25 @@ def parse_script(path: str) -> Script:
         m = _HINT_RE.match(line)
         if m:
             hint, rest = m.group("hint").strip(), m.group("rest").strip()
-            shot_type = SHOT_HINTS.get(hint, "")
+            # [远景·缓推·航拍] → 景别 + 运镜 + 修饰，兼容旧写法 [远景]；
+            # 修饰词可连写（如"航拍缓推"），按已知关键词做子串拆分
+            tokens = re.split(r"[·•・.\s]", hint)
+            shot_type = SHOT_HINTS.get(tokens[0].strip(), "")
+            camera_move, mods = "", []
+            rest_text = "".join(tokens[1:])
+            for key in sorted(MODIFIER_HINTS, key=len, reverse=True):
+                if key in rest_text:
+                    en = MODIFIER_HINTS[key]
+                    if key in MOVE_KEYS and not camera_move:
+                        camera_move = en
+                    elif key not in MOVE_KEYS and en not in mods:
+                        mods.append(en)
+                    rest_text = rest_text.replace(key, "", 1)
             action_cn, action_en = _split_bilingual(rest)
             script.blocks.append(Block(kind="shot_hint", shot_type=shot_type,
-                                       action_cn=action_cn, action_en=action_en))
+                                       action_cn=action_cn, action_en=action_en,
+                                       camera_move=camera_move,
+                                       modifiers_en=", ".join(mods)))
             continue
         m = _DIALOGUE_RE.match(line)
         if m:

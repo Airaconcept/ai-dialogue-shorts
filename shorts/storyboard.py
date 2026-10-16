@@ -19,13 +19,30 @@ from .characters import Character, find_character
 
 STYLE_TAIL = ("cinematic video, vertical 9:16 portrait composition, "
               "35mm film look, shallow depth of field")
-SHOT_TYPE_EN = {
-    "wide": "wide establishing shot, slow push-in",
-    "full": "full shot, slow push-in",
-    "medium": "medium shot, subtle parallax drift",
-    "closeup": "medium close-up, gentle push-in",
-    "extreme_closeup": "extreme close-up, slow push-in",
+SHOT_SIZE_EN = {
+    "wide": "wide establishing shot",
+    "full": "full shot",
+    "medium": "medium shot",
+    "closeup": "medium close-up",
+    "extreme_closeup": "extreme close-up",
 }
+# 没有显式运镜时按镜号轮换，避免整条片子全是推镜
+CAMERA_ROTATION = [
+    "slow push-in", "slow pull-back",
+    "gentle pan left", "gentle pan right",
+    "static tripod framing", "slow tilt up",
+]
+# 说话表演：每镜轮换，让人物嘴部有说话动作、带手势和表情
+# （文生视频只能做到"像在说话"，逐字口型对齐需要单独的 lip-sync 工序）
+PERFORMANCE = [
+    "the speaker's mouth moves naturally as if talking, with subtle hand gestures",
+    "the speaker talks with gentle head nods and expressive eyes",
+    "the speaker's lips move as in conversation, one hand gesturing lightly for emphasis",
+    "the speaker speaks calmly, slight smile, relaxed shoulders",
+    "the speaker talks with thoughtful expression, occasional eyebrow raise",
+    "the speaker's mouth moves as if speaking, hands resting then one small illustrative gesture",
+    "the speaker delivers the line warmly, natural blink and soft facial motion",
+]
 
 
 @dataclass
@@ -56,6 +73,8 @@ def build_storyboard(script: Script,
         # 一句对白 = 一镜
         n += 1
         dlg = block.dialogue
+        hint_move = pending_hint.camera_move if pending_hint else ""
+        hint_mods = pending_hint.modifiers_en if pending_hint else ""
         if pending_hint and pending_hint.shot_type:
             shot_type = pending_hint.shot_type
             action_cn = pending_hint.action_cn
@@ -83,8 +102,12 @@ def build_storyboard(script: Script,
                 lock_blocks.append(f"{who}: {c.prompt_block()}")
         lock_text = "; ".join(lock_blocks)
 
-        parts = [STYLE_TAIL + ".",
-                 f"{SHOT_TYPE_EN.get(shot_type, shot_type)}."]
+        parts = [STYLE_TAIL + "."]
+        move = hint_move or CAMERA_ROTATION[(n - 1) % len(CAMERA_ROTATION)]
+        parts.append(f"{SHOT_SIZE_EN.get(shot_type, shot_type)}, {move}.")
+        if hint_mods:
+            parts.append(hint_mods.rstrip(".") + ".")
+        parts.append("Performance: " + PERFORMANCE[(n - 1) % len(PERFORMANCE)] + ".")
         if action_en:
             parts.append(action_en.rstrip(".") + ".")
         elif action_cn:

@@ -59,7 +59,7 @@ def cmd_md(args):
 
 
 def cmd_build(args):
-    from shorts.video_gen import WanVideoGenerator
+    from shorts.video_gen import WanVideoGenerator, generate_placeholder
     from shorts.voice import synthesize_line
     from shorts.subtitle import render_subtitle, split_cn, split_en
     from shorts.assemble import assemble
@@ -74,13 +74,17 @@ def cmd_build(args):
     shots_json.write_text(shots_to_json(shots), encoding="utf-8")
     print(f"分镜：{len(shots)} 镜 -> {shots_json}")
 
-    vgen = WanVideoGenerator()
+    vgen = None if args.placeholder_video else WanVideoGenerator()
     for s in shots:
         n = s.n
         clip = work / f"clip_{n}.mp4"
         if not clip.exists() or args.force_video:
-            print(f"[video] 镜{n} 生成中…")
-            vgen.generate(s.video_prompt, str(clip), duration=5)
+            if args.placeholder_video:
+                print(f"[video] 镜{n} 占位片段…")
+                generate_placeholder(str(clip), duration=6, seed=n)
+            else:
+                print(f"[video] 镜{n} 生成中…")
+                vgen.generate(s.video_prompt, str(clip), duration=5)
         wav = work / f"audio_{n}.mp3"
         print(f"[voice] 镜{n} {s.speaker} 配音…")
         synthesize_line(s.line_cn, s.voice or "zh-CN-XiaoxiaoNeural", str(wav))
@@ -120,6 +124,8 @@ def main():
     p.add_argument("-o", default="")
     p.add_argument("--force-video", action="store_true",
                    help="重新生成视频片段（默认跳过已存在的）")
+    p.add_argument("--placeholder-video", action="store_true",
+                   help="用占位片段代替 AI 视频（魔搭未绑定前的全链路测试）")
     p.set_defaults(fn=cmd_build)
 
     args = ap.parse_args()
